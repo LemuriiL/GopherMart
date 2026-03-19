@@ -18,7 +18,8 @@ func Run() error {
 	store := storage.NewMemoryStorage()
 	authService := service.NewAuthService(store, cfg.JWTSecret)
 	orderService := service.NewOrderService(store)
-	h := handler.NewHandler(authService, orderService)
+	balanceService := service.NewBalanceService(store)
+	h := handler.NewHandler(authService, orderService, balanceService)
 
 	r := chi.NewRouter()
 
@@ -29,9 +30,9 @@ func Run() error {
 		r.Use(middleware.Auth(cfg.JWTSecret))
 		r.Post("/api/user/orders", h.CreateOrder)
 		r.Get("/api/user/orders", h.GetOrders)
-		r.Get("/api/user/balance", h.GetBalanceStub)
-		r.Post("/api/user/balance/withdraw", h.WithdrawStub)
-		r.Get("/api/user/withdrawals", h.GetWithdrawalsStub)
+		r.Get("/api/user/balance", h.GetBalance)
+		r.Post("/api/user/balance/withdraw", h.Withdraw)
+		r.Get("/api/user/withdrawals", h.GetWithdrawals)
 	})
 
 	return http.ListenAndServe(cfg.RunAddress, r)

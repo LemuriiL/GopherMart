@@ -15,3 +15,10 @@ type Order struct {
 	Accrual    float64
 	UploadedAt time.Time
 }
+
+type Withdrawal struct {
+	Order       string    `json:"order"`
+	UserID      int64     `json:"-"`
+	Sum         float64   `json:"sum"`
+	ProcessedAt time.Time `json:"processed_at"`
+}

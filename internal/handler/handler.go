@@ -24,9 +24,16 @@ type OrderService interface {
 	GetUserOrders(userID int64) ([]model.Order, error)
 }
 
+type BalanceService interface {
+	GetBalance(userID int64) (float64, float64)
+	Withdraw(userID int64, order string, sum float64) error
+	GetWithdrawals(userID int64) []model.Withdrawal
+}
+
 type Handler struct {
-	auth   AuthService
-	orders OrderService
+	auth    AuthService
+	orders  OrderService
+	balance BalanceService
 }
 
 type authRequest struct {
@@ -41,10 +48,21 @@ type orderResponse struct {
 	UploadedAt time.Time `json:"uploaded_at"`
 }
 
-func NewHandler(auth AuthService, orders OrderService) *Handler {
+type withdrawRequest struct {
+	Order string  `json:"order"`
+	Sum   float64 `json:"sum"`
+}
+
+type balanceResponse struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
+func NewHandler(auth AuthService, orders OrderService, balance BalanceService) *Handler {
 	return &Handler{
-		auth:   auth,
-		orders: orders,
+		auth:    auth,
+		orders:  orders,
+		balance: balance,
 	}
 }
 
@@ -183,14 +201,112 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) GetBalanceStub(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	current, withdrawn := h.balance.GetBalance(userID)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(balanceResponse{
+		Current:   current,
+		Withdrawn: withdrawn,
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
-func (h *Handler) WithdrawStub(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var req withdrawRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if req.Order == "" || req.Sum <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !isDigits(req.Order) || !isValidLuhn(req.Order) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	err := h.balance.Withdraw(userID, req.Order, req.Sum)
+	if err != nil {
+		if errors.Is(err, service.ErrNotEnoughBalance) {
+			w.WriteHeader(http.StatusPaymentRequired)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetWithdrawalsStub(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	withdrawals := h.balance.GetWithdrawals(userID)
+	if len(withdrawals) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isValidLuhn(number string) bool {
+	sum := 0
+	double := false
+
+	for i := len(number) - 1; i >= 0; i-- {
+		digit := int(number[i] - '0')
+
+		if double {
+			digit *= 2
+			if digit > 9 {
+				digit -= 9
+			}
+		}
+
+		sum += digit
+		double = !double
+	}
+
+	return sum%10 == 0
 }

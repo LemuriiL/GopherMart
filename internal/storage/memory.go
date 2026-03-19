@@ -15,17 +15,19 @@ var ErrOrderUploadedBySameUser = errors.New("order already uploaded by same user
 var ErrOrderUploadedByAnotherUser = errors.New("order already uploaded by another user")
 
 type MemoryStorage struct {
-	mu     sync.RWMutex
-	users  map[string]*model.User
-	orders map[string]*model.Order
-	nextID int64
+	mu          sync.RWMutex
+	users       map[string]*model.User
+	orders      map[string]*model.Order
+	withdrawals []model.Withdrawal
+	nextID      int64
 }
 
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		users:  make(map[string]*model.User),
-		orders: make(map[string]*model.Order),
-		nextID: 1,
+		users:       make(map[string]*model.User),
+		orders:      make(map[string]*model.Order),
+		withdrawals: make([]model.Withdrawal, 0),
+		nextID:      1,
 	}
 }
 
@@ -77,7 +79,7 @@ func (s *MemoryStorage) SaveOrder(number string, userID int64) error {
 		Number:     number,
 		UserID:     userID,
 		Status:     "NEW",
-		Accrual:    0,
+		Accrual:    100,
 		UploadedAt: time.Now(),
 	}
 
@@ -101,4 +103,59 @@ func (s *MemoryStorage) GetOrdersByUserID(userID int64) ([]model.Order, error) {
 	})
 
 	return orders, nil
+}
+
+func (s *MemoryStorage) GetBalance(userID int64) (float64, float64) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var accrual float64
+	var withdrawn float64
+
+	for _, order := range s.orders {
+		if order.UserID == userID {
+			accrual += order.Accrual
+		}
+	}
+
+	for _, withdrawal := range s.withdrawals {
+		if withdrawal.UserID == userID {
+			withdrawn += withdrawal.Sum
+		}
+	}
+
+	return accrual - withdrawn, withdrawn
+}
+
+func (s *MemoryStorage) AddWithdrawal(order string, userID int64, sum float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.withdrawals = append(s.withdrawals, model.Withdrawal{
+		Order:       order,
+		UserID:      userID,
+		Sum:         sum,
+		ProcessedAt: time.Now(),
+	})
+
+	return nil
+}
+
+func (s *MemoryStorage) GetWithdrawals(userID int64) []model.Withdrawal {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]model.Withdrawal, 0)
+
+	for _, withdrawal := range s.withdrawals {
+		if withdrawal.UserID == userID {
+			result = append(result, withdrawal)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ProcessedAt.After(result[j].ProcessedAt)
+	})
+
+	return result
 }
