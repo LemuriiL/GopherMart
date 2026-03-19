@@ -17,7 +17,8 @@ func Run() error {
 
 	store := storage.NewMemoryStorage()
 	authService := service.NewAuthService(store, cfg.JWTSecret)
-	h := handler.NewHandler(authService)
+	orderService := service.NewOrderService(store)
+	h := handler.NewHandler(authService, orderService)
 
 	r := chi.NewRouter()
 
@@ -26,7 +27,7 @@ func Run() error {
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(cfg.JWTSecret))
-		r.Post("/api/user/orders", h.CreateOrderStub)
+		r.Post("/api/user/orders", h.CreateOrder)
 		r.Get("/api/user/orders", h.GetOrdersStub)
 		r.Get("/api/user/balance", h.GetBalanceStub)
 		r.Post("/api/user/balance/withdraw", h.WithdrawStub)

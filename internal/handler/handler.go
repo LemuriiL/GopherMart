@@ -3,8 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
+	"github.com/LemuriiL/GopherMart/internal/middleware"
 	"github.com/LemuriiL/GopherMart/internal/service"
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
@@ -14,8 +17,13 @@ type AuthService interface {
 	Login(login, password string) (string, error)
 }
 
+type OrderService interface {
+	UploadOrder(number string, userID int64) error
+}
+
 type Handler struct {
-	auth AuthService
+	auth   AuthService
+	orders OrderService
 }
 
 type authRequest struct {
@@ -23,8 +31,11 @@ type authRequest struct {
 	Password string `json:"password"`
 }
 
-func NewHandler(auth AuthService) *Handler {
-	return &Handler{auth: auth}
+func NewHandler(auth AuthService, orders OrderService) *Handler {
+	return &Handler{
+		auth:   auth,
+		orders: orders,
+	}
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +92,44 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) CreateOrderStub(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	number := strings.TrimSpace(string(body))
+	if number == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = h.orders.UploadOrder(number, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidOrderNumber) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+		if errors.Is(err, storage.ErrOrderUploadedBySameUser) {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if errors.Is(err, storage.ErrOrderUploadedByAnotherUser) {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) GetOrdersStub(w http.ResponseWriter, r *http.Request) {
