@@ -1,0 +1,37 @@
+package app
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/LemuriiL/GopherMart/internal/config"
+	"github.com/LemuriiL/GopherMart/internal/handler"
+	"github.com/LemuriiL/GopherMart/internal/middleware"
+	"github.com/LemuriiL/GopherMart/internal/service"
+	"github.com/LemuriiL/GopherMart/internal/storage"
+)
+
+func Run() error {
+	cfg := config.New()
+
+	store := storage.NewMemoryStorage()
+	authService := service.NewAuthService(store, cfg.JWTSecret)
+	h := handler.NewHandler(authService)
+
+	r := chi.NewRouter()
+
+	r.Post("/api/user/register", h.Register)
+	r.Post("/api/user/login", h.Login)
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Auth(cfg.JWTSecret))
+		r.Post("/api/user/orders", h.CreateOrderStub)
+		r.Get("/api/user/orders", h.GetOrdersStub)
+		r.Get("/api/user/balance", h.GetBalanceStub)
+		r.Post("/api/user/balance/withdraw", h.WithdrawStub)
+		r.Get("/api/user/withdrawals", h.GetWithdrawalsStub)
+	})
+
+	return http.ListenAndServe(cfg.RunAddress, r)
+}
