@@ -1,18 +1,12 @@
 package storage
 
 import (
-	"errors"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/LemuriiL/GopherMart/internal/model"
 )
-
-var ErrUserExists = errors.New("user already exists")
-var ErrUserNotFound = errors.New("user not found")
-var ErrOrderUploadedBySameUser = errors.New("order already uploaded by same user")
-var ErrOrderUploadedByAnotherUser = errors.New("order already uploaded by another user")
 
 type MemoryStorage struct {
 	mu          sync.RWMutex
@@ -79,7 +73,7 @@ func (s *MemoryStorage) SaveOrder(number string, userID int64) error {
 		Number:     number,
 		UserID:     userID,
 		Status:     "NEW",
-		Accrual:    100,
+		Accrual:    0,
 		UploadedAt: time.Now(),
 	}
 
@@ -158,4 +152,32 @@ func (s *MemoryStorage) GetWithdrawals(userID int64) []model.Withdrawal {
 	})
 
 	return result
+}
+
+func (s *MemoryStorage) GetNewOrders() []model.Order {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]model.Order, 0)
+
+	for _, order := range s.orders {
+		if order.Status == "NEW" || order.Status == "PROCESSING" {
+			result = append(result, *order)
+		}
+	}
+
+	return result
+}
+
+func (s *MemoryStorage) UpdateOrder(number string, status string, accrual float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	order, ok := s.orders[number]
+	if !ok {
+		return
+	}
+
+	order.Status = status
+	order.Accrual = accrual
 }
