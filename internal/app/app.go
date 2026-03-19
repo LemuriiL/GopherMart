@@ -28,7 +28,7 @@ func Run() error {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(cfg.JWTSecret))
 		r.Post("/api/user/orders", h.CreateOrder)
-		r.Get("/api/user/orders", h.GetOrdersStub)
+		r.Get("/api/user/orders", h.GetOrders)
 		r.Get("/api/user/balance", h.GetBalanceStub)
 		r.Post("/api/user/balance/withdraw", h.WithdrawStub)
 		r.Get("/api/user/withdrawals", h.GetWithdrawalsStub)

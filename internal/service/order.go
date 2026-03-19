@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"github.com/LemuriiL/GopherMart/internal/model"
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
 
@@ -12,11 +13,21 @@ type OrderSaver interface {
 	SaveOrder(number string, userID int64) error
 }
 
-type OrderService struct {
-	store OrderSaver
+type OrderReader interface {
+	GetOrdersByUserID(userID int64) ([]model.Order, error)
 }
 
-func NewOrderService(store OrderSaver) *OrderService {
+type OrderService struct {
+	store interface {
+		OrderSaver
+		OrderReader
+	}
+}
+
+func NewOrderService(store interface {
+	OrderSaver
+	OrderReader
+}) *OrderService {
 	return &OrderService{store: store}
 }
 
@@ -41,6 +52,10 @@ func (s *OrderService) UploadOrder(number string, userID int64) error {
 	}
 
 	return nil
+}
+
+func (s *OrderService) GetUserOrders(userID int64) ([]model.Order, error) {
+	return s.store.GetOrdersByUserID(userID)
 }
 
 func isDigits(s string) bool {

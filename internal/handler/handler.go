@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/LemuriiL/GopherMart/internal/middleware"
+	"github.com/LemuriiL/GopherMart/internal/model"
 	"github.com/LemuriiL/GopherMart/internal/service"
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
@@ -19,6 +21,7 @@ type AuthService interface {
 
 type OrderService interface {
 	UploadOrder(number string, userID int64) error
+	GetUserOrders(userID int64) ([]model.Order, error)
 }
 
 type Handler struct {
@@ -29,6 +32,13 @@ type Handler struct {
 type authRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
+}
+
+type orderResponse struct {
+	Number     string    `json:"number"`
+	Status     string    `json:"status"`
+	Accrual    *float64  `json:"accrual,omitempty"`
+	UploadedAt time.Time `json:"uploaded_at"`
 }
 
 func NewHandler(auth AuthService, orders OrderService) *Handler {
@@ -132,8 +142,45 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) GetOrdersStub(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	orders, err := h.orders.GetUserOrders(userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if len(orders) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	response := make([]orderResponse, 0, len(orders))
+	for _, order := range orders {
+		item := orderResponse{
+			Number:     order.Number,
+			Status:     order.Status,
+			UploadedAt: order.UploadedAt,
+		}
+
+		if order.Accrual != 0 {
+			accrual := order.Accrual
+			item.Accrual = &accrual
+		}
+
+		response = append(response, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) GetBalanceStub(w http.ResponseWriter, r *http.Request) {

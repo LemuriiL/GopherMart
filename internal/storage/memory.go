@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"sort"
 	"sync"
 	"time"
 
@@ -81,4 +82,23 @@ func (s *MemoryStorage) SaveOrder(number string, userID int64) error {
 	}
 
 	return nil
+}
+
+func (s *MemoryStorage) GetOrdersByUserID(userID int64) ([]model.Order, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	orders := make([]model.Order, 0)
+
+	for _, order := range s.orders {
+		if order.UserID == userID {
+			orders = append(orders, *order)
+		}
+	}
+
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].UploadedAt.After(orders[j].UploadedAt)
+	})
+
+	return orders, nil
 }
