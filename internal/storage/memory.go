@@ -1,3 +1,4 @@
+// Package storage - хранилища данных приложения.
 package storage
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/LemuriiL/GopherMart/internal/model"
 )
 
+// MemoryStorage - простое in-memory хранилище для разработки и тестов.
 type MemoryStorage struct {
 	mu          sync.RWMutex
 	users       map[string]*model.User
@@ -16,6 +18,7 @@ type MemoryStorage struct {
 	nextID      int64
 }
 
+// NewMemoryStorage - создаёт новое in-memory хранилище.
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		users:       make(map[string]*model.User),
@@ -25,6 +28,7 @@ func NewMemoryStorage() *MemoryStorage {
 	}
 }
 
+// CreateUser - сохраняет нового пользователя.
 func (s *MemoryStorage) CreateUser(login, passwordHash string) (*model.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -45,6 +49,7 @@ func (s *MemoryStorage) CreateUser(login, passwordHash string) (*model.User, err
 	return user, nil
 }
 
+// GetUserByLogin - возвращает пользователя по логину.
 func (s *MemoryStorage) GetUserByLogin(login string) (*model.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -57,6 +62,7 @@ func (s *MemoryStorage) GetUserByLogin(login string) (*model.User, error) {
 	return user, nil
 }
 
+// SaveOrder - сохраняет заказ пользователя.
 func (s *MemoryStorage) SaveOrder(number string, userID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -80,6 +86,7 @@ func (s *MemoryStorage) SaveOrder(number string, userID int64) error {
 	return nil
 }
 
+// GetOrdersByUserID - возвращает заказы пользователя.
 func (s *MemoryStorage) GetOrdersByUserID(userID int64) ([]model.Order, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -99,6 +106,7 @@ func (s *MemoryStorage) GetOrdersByUserID(userID int64) ([]model.Order, error) {
 	return orders, nil
 }
 
+// GetBalance - возвращает текущий баланс и сумму списаний пользователя.
 func (s *MemoryStorage) GetBalance(userID int64) (float64, float64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -121,6 +129,7 @@ func (s *MemoryStorage) GetBalance(userID int64) (float64, float64) {
 	return accrual - withdrawn, withdrawn
 }
 
+// AddWithdrawal - сохраняет факт списания средств.
 func (s *MemoryStorage) AddWithdrawal(order string, userID int64, sum float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -135,6 +144,7 @@ func (s *MemoryStorage) AddWithdrawal(order string, userID int64, sum float64) e
 	return nil
 }
 
+// GetWithdrawals - возвращает историю списаний пользователя.
 func (s *MemoryStorage) GetWithdrawals(userID int64) []model.Withdrawal {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -154,6 +164,7 @@ func (s *MemoryStorage) GetWithdrawals(userID int64) []model.Withdrawal {
 	return result
 }
 
+// GetNewOrders - возвращает заказы, которые ещё нужно обработать.
 func (s *MemoryStorage) GetNewOrders() []model.Order {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -169,6 +180,7 @@ func (s *MemoryStorage) GetNewOrders() []model.Order {
 	return result
 }
 
+// UpdateOrder - обновляет статус и начисление заказа.
 func (s *MemoryStorage) UpdateOrder(number string, status string, accrual float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

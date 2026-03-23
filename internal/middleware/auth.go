@@ -1,3 +1,4 @@
+// Package middleware - промежуточные обработчики HTTP.
 package middleware
 
 import (
@@ -8,10 +9,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// contextKey - тип ключа для контекста.
 type contextKey string
 
+// UserIDKey - ключ для хранения userID в контексте.
 const UserIDKey contextKey = "userID"
 
+// Auth - middleware для проверки JWT токена.
+// Если токен валиден - кладёт user_id в контекст.
 func Auth(secret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

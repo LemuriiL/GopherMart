@@ -1,3 +1,4 @@
+// Package config - конфигурация приложения.
 package config
 
 import (
@@ -5,6 +6,7 @@ import (
 	"os"
 )
 
+// Config - хранит настройки приложения.
 type Config struct {
 	RunAddress     string
 	JWTSecret      string
@@ -12,6 +14,7 @@ type Config struct {
 	DatabaseURI    string
 }
 
+// New - создаёт конфиг из флагов и переменных окружения.
 func New() *Config {
 	cfg := &Config{
 		RunAddress:     ":8080",
@@ -30,6 +33,7 @@ func New() *Config {
 	return cfg
 }
 
+// getEnv - берёт значение из окружения или возвращает fallback.
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

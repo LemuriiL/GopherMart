@@ -1,3 +1,4 @@
+// Package service - бизнес логика приложения.
 package service
 
 import (
@@ -6,29 +7,34 @@ import (
 	"github.com/LemuriiL/GopherMart/internal/model"
 )
 
+// ErrNotEnoughBalance - недостаточно средств на балансе.
 var ErrNotEnoughBalance = errors.New("not enough balance")
 
+// BalanceStorage - интерфейс для работы с балансом в хранилище.
 type BalanceStorage interface {
 	GetBalance(userID int64) (float64, float64)
 	AddWithdrawal(order string, userID int64, sum float64) error
 	GetWithdrawals(userID int64) []model.Withdrawal
 }
 
+// BalanceService - отвечает за баланс и списания.
 type BalanceService struct {
 	store BalanceStorage
 }
 
+// NewBalanceService - создаёт новый BalanceService.
 func NewBalanceService(store BalanceStorage) *BalanceService {
 	return &BalanceService{store: store}
 }
 
+// GetBalance - возвращает текущий баланс и сумму списаний.
 func (s *BalanceService) GetBalance(userID int64) (float64, float64) {
 	return s.store.GetBalance(userID)
 }
 
+// Withdraw - списывает баллы с баланса пользователя.
 func (s *BalanceService) Withdraw(userID int64, order string, sum float64) error {
 	current, _ := s.store.GetBalance(userID)
-
 	if sum > current {
 		return ErrNotEnoughBalance
 	}
@@ -36,6 +42,7 @@ func (s *BalanceService) Withdraw(userID int64, order string, sum float64) error
 	return s.store.AddWithdrawal(order, userID, sum)
 }
 
+// GetWithdrawals - возвращает историю списаний пользователя.
 func (s *BalanceService) GetWithdrawals(userID int64) []model.Withdrawal {
 	return s.store.GetWithdrawals(userID)
 }

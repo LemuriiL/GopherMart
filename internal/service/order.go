@@ -1,3 +1,4 @@
+// Package service - бизнес логика приложения.
 package service
 
 import (
@@ -7,16 +8,20 @@ import (
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
 
+// ErrInvalidOrderNumber - неверный номер заказа.
 var ErrInvalidOrderNumber = errors.New("invalid order number")
 
+// OrderSaver - интерфейс для сохранения заказа.
 type OrderSaver interface {
 	SaveOrder(number string, userID int64) error
 }
 
+// OrderReader - интерфейс для получения заказов пользователя.
 type OrderReader interface {
 	GetOrdersByUserID(userID int64) ([]model.Order, error)
 }
 
+// OrderService - отвечает за работу с заказами.
 type OrderService struct {
 	store interface {
 		OrderSaver
@@ -24,6 +29,7 @@ type OrderService struct {
 	}
 }
 
+// NewOrderService - создаёт новый OrderService.
 func NewOrderService(store interface {
 	OrderSaver
 	OrderReader
@@ -31,6 +37,7 @@ func NewOrderService(store interface {
 	return &OrderService{store: store}
 }
 
+// UploadOrder - принимает и валидирует номер заказа.
 func (s *OrderService) UploadOrder(number string, userID int64) error {
 	if !isDigits(number) {
 		return ErrInvalidOrderNumber
@@ -54,10 +61,12 @@ func (s *OrderService) UploadOrder(number string, userID int64) error {
 	return nil
 }
 
+// GetUserOrders - возвращает заказы пользователя.
 func (s *OrderService) GetUserOrders(userID int64) ([]model.Order, error) {
 	return s.store.GetOrdersByUserID(userID)
 }
 
+// isDigits - проверяет, что строка состоит только из цифр.
 func isDigits(s string) bool {
 	if s == "" {
 		return false
@@ -72,6 +81,7 @@ func isDigits(s string) bool {
 	return true
 }
 
+// isValidLuhn - проверяет номер по алгоритму Луна.
 func isValidLuhn(number string) bool {
 	sum := 0
 	double := false

@@ -1,3 +1,4 @@
+// Package app - точка входа приложения.
 package app
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
 
+// Run - инициализирует всё приложение и запускает HTTP сервер.
 func Run() error {
 	cfg := config.New()
 

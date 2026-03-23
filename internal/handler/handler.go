@@ -1,3 +1,4 @@
+// Package handler - HTTP обработчики приложения.
 package handler
 
 import (
@@ -6,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/LemuriiL/GopherMart/internal/middleware"
 	"github.com/LemuriiL/GopherMart/internal/model"
@@ -14,22 +14,26 @@ import (
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
 
+// AuthService - интерфейс для работы с регистрацией и логином.
 type AuthService interface {
 	Register(login, password string) (string, error)
 	Login(login, password string) (string, error)
 }
 
+// OrderService - интерфейс для работы с заказами.
 type OrderService interface {
 	UploadOrder(number string, userID int64) error
 	GetUserOrders(userID int64) ([]model.Order, error)
 }
 
+// BalanceService - интерфейс для работы с балансом и списаниями.
 type BalanceService interface {
 	GetBalance(userID int64) (float64, float64)
 	Withdraw(userID int64, order string, sum float64) error
 	GetWithdrawals(userID int64) []model.Withdrawal
 }
 
+// Handler - объединяет HTTP обработчики приложения.
 type Handler struct {
 	auth    AuthService
 	orders  OrderService
@@ -42,10 +46,10 @@ type authRequest struct {
 }
 
 type orderResponse struct {
-	Number     string    `json:"number"`
-	Status     string    `json:"status"`
-	Accrual    *float64  `json:"accrual,omitempty"`
-	UploadedAt time.Time `json:"uploaded_at"`
+	Number     string   `json:"number"`
+	Status     string   `json:"status"`
+	Accrual    *float64 `json:"accrual,omitempty"`
+	UploadedAt string   `json:"uploaded_at"`
 }
 
 type withdrawRequest struct {
@@ -58,6 +62,13 @@ type balanceResponse struct {
 	Withdrawn float64 `json:"withdrawn"`
 }
 
+type withdrawalResponse struct {
+	Order       string  `json:"order"`
+	Sum         float64 `json:"sum"`
+	ProcessedAt string  `json:"processed_at"`
+}
+
+// NewHandler - создаёт новый набор HTTP обработчиков.
 func NewHandler(auth AuthService, orders OrderService, balance BalanceService) *Handler {
 	return &Handler{
 		auth:    auth,
@@ -66,16 +77,17 @@ func NewHandler(auth AuthService, orders OrderService, balance BalanceService) *
 	}
 }
 
+// Register - регистрирует пользователя.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if req.Login == "" || req.Password == "" {
-		http.Error(w, "empty login or password", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -85,7 +97,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -93,16 +105,17 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Login - аутентифицирует пользователя.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if req.Login == "" || req.Password == "" {
-		http.Error(w, "empty login or password", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -112,7 +125,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -120,6 +133,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// CreateOrder - принимает номер заказа от пользователя.
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
@@ -160,6 +174,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// GetOrders - возвращает список заказов пользователя.
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
@@ -183,7 +198,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		item := orderResponse{
 			Number:     order.Number,
 			Status:     order.Status,
-			UploadedAt: order.UploadedAt,
+			UploadedAt: order.UploadedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
 		if order.Accrual != 0 {
@@ -201,6 +216,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetBalance - возвращает текущий баланс пользователя.
 func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
@@ -220,6 +236,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Withdraw - списывает баллы с баланса пользователя.
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
@@ -245,7 +262,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 	err := h.balance.Withdraw(userID, req.Order, req.Sum)
 	if err != nil {
-		if errors.Is(err, service.ErrNotEnoughBalance) {
+		if errors.Is(err, service.ErrNotEnoughBalance) || errors.Is(err, storage.ErrNotEnoughBalance) {
 			w.WriteHeader(http.StatusPaymentRequired)
 			return
 		}
@@ -256,6 +273,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetWithdrawals - возвращает историю списаний пользователя.
 func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
@@ -269,13 +287,23 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := make([]withdrawalResponse, 0, len(withdrawals))
+	for _, withdrawal := range withdrawals {
+		response = append(response, withdrawalResponse{
+			Order:       withdrawal.Order,
+			Sum:         withdrawal.Sum,
+			ProcessedAt: withdrawal.ProcessedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
+// isDigits - проверяет, что строка состоит только из цифр.
 func isDigits(s string) bool {
 	if s == "" {
 		return false
@@ -290,6 +318,7 @@ func isDigits(s string) bool {
 	return true
 }
 
+// isValidLuhn - проверяет номер по алгоритму Луна.
 func isValidLuhn(number string) bool {
 	sum := 0
 	double := false
