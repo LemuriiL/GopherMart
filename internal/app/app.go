@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 
 	"github.com/LemuriiL/GopherMart/internal/accrual"
@@ -45,19 +44,18 @@ func Run() error {
 
 	h := handler.NewHandler(authService, orderService, balanceService)
 
-	r := chi.NewRouter()
+	mux := http.NewServeMux()
 
-	r.Post("/api/user/register", h.Register)
-	r.Post("/api/user/login", h.Login)
+	mux.HandleFunc("POST /api/user/register", h.Register)
+	mux.HandleFunc("POST /api/user/login", h.Login)
 
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(cfg.JWTSecret))
-		r.Post("/api/user/orders", h.CreateOrder)
-		r.Get("/api/user/orders", h.GetOrders)
-		r.Get("/api/user/balance", h.GetBalance)
-		r.Post("/api/user/balance/withdraw", h.Withdraw)
-		r.Get("/api/user/withdrawals", h.GetWithdrawals)
-	})
+	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
-	return http.ListenAndServe(cfg.RunAddress, r)
+	mux.Handle("POST /api/user/orders", authMiddleware(http.HandlerFunc(h.CreateOrder)))
+	mux.Handle("GET /api/user/orders", authMiddleware(http.HandlerFunc(h.GetOrders)))
+	mux.Handle("GET /api/user/balance", authMiddleware(http.HandlerFunc(h.GetBalance)))
+	mux.Handle("POST /api/user/balance/withdraw", authMiddleware(http.HandlerFunc(h.Withdraw)))
+	mux.Handle("GET /api/user/withdrawals", authMiddleware(http.HandlerFunc(h.GetWithdrawals)))
+
+	return http.ListenAndServe(cfg.RunAddress, mux)
 }

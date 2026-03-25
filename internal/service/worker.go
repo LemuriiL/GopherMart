@@ -2,7 +2,7 @@
 package service
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -49,7 +49,7 @@ func (w *Worker) process() {
 	for _, order := range orders {
 		resp, statusCode, retryAfter, err := w.client.GetOrder(order.Number)
 		if err != nil {
-			log.Printf("worker: accrual request failed for order %s: %v", order.Number, err)
+			slog.Error("accrual request failed", "order", order.Number, "error", err)
 			continue
 		}
 

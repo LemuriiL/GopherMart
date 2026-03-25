@@ -4,6 +4,7 @@ package service
 import (
 	"errors"
 
+	"github.com/LemuriiL/GopherMart/internal/luhn"
 	"github.com/LemuriiL/GopherMart/internal/model"
 	"github.com/LemuriiL/GopherMart/internal/storage"
 )
@@ -39,11 +40,11 @@ func NewOrderService(store interface {
 
 // UploadOrder - принимает и валидирует номер заказа.
 func (s *OrderService) UploadOrder(number string, userID int64) error {
-	if !isDigits(number) {
+	if !luhn.IsDigits(number) {
 		return ErrInvalidOrderNumber
 	}
 
-	if !isValidLuhn(number) {
+	if !luhn.IsValid(number) {
 		return ErrInvalidOrderNumber
 	}
 
@@ -64,41 +65,4 @@ func (s *OrderService) UploadOrder(number string, userID int64) error {
 // GetUserOrders - возвращает заказы пользователя.
 func (s *OrderService) GetUserOrders(userID int64) ([]model.Order, error) {
 	return s.store.GetOrdersByUserID(userID)
-}
-
-// isDigits - проверяет, что строка состоит только из цифр.
-func isDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isValidLuhn - проверяет номер по алгоритму Луна.
-func isValidLuhn(number string) bool {
-	sum := 0
-	double := false
-
-	for i := len(number) - 1; i >= 0; i-- {
-		digit := int(number[i] - '0')
-
-		if double {
-			digit *= 2
-			if digit > 9 {
-				digit -= 9
-			}
-		}
-
-		sum += digit
-		double = !double
-	}
-
-	return sum%10 == 0
 }

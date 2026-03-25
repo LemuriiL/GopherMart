@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/LemuriiL/GopherMart/internal/luhn"
 	"github.com/LemuriiL/GopherMart/internal/middleware"
 	"github.com/LemuriiL/GopherMart/internal/model"
 	"github.com/LemuriiL/GopherMart/internal/service"
@@ -255,7 +256,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isDigits(req.Order) || !isValidLuhn(req.Order) {
+	if !luhn.IsDigits(req.Order) || !luhn.IsValid(req.Order) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
@@ -301,41 +302,4 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-}
-
-// isDigits - проверяет, что строка состоит только из цифр.
-func isDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isValidLuhn - проверяет номер по алгоритму Луна.
-func isValidLuhn(number string) bool {
-	sum := 0
-	double := false
-
-	for i := len(number) - 1; i >= 0; i-- {
-		digit := int(number[i] - '0')
-
-		if double {
-			digit *= 2
-			if digit > 9 {
-				digit -= 9
-			}
-		}
-
-		sum += digit
-		double = !double
-	}
-
-	return sum%10 == 0
 }
